@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Import first timers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Import from a spreadsheet</h1>
+    <p>Useful for loading old cards that were typed into Excel. Save the sheet as CSV, then upload it here.</p>
+  </div>
+</div>
+
+<div class="grid grid-wide">
+  <div class="panel">
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="field">
+        <label for="file">CSV file</label>
+        <input type="file" id="file" name="file" accept=".csv,text/csv" required>
+      </div>
+      <button class="btn" type="submit">{{ icon("upload") }}Import</button>
+    </form>
+
+    {% if result %}
+    <div style="margin-top:22px">
+      <h2>Result</h2>
+      <p>{{ result.imported }} of {{ result.rows }} rows imported.</p>
+      {% if result.problems %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Row</th><th scope="col">What happened</th></tr></thead>
+          <tbody>{% for n, msg in result.problems %}<tr><td class="num">{{ n }}</td><td>{{ msg }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="aside-note">
+    <h2>How to lay out the sheet</h2>
+    <p>Put these column names in the first row. Only <span class="code">first_name</span> and <span class="code">visit_date</span> are required.</p>
+    <p class="small"><span class="code">first_name</span> <span class="code">other_names</span> <span class="code">phone</span> <span class="code">residence</span> <span class="code">visit_date</span> <span class="code">service</span> <span class="code">born_again</span> <span class="code">prayer_points</span> <span class="code">prayer_categories</span> <span class="code">sms_consent</span> <span class="code">notes</span></p>
+    <p class="small">Dates can be 2026-10-04 or 04/10/2026. Born again can be yes, no or not sure. Visits older than {{ settings.followup_weeks|int + 2 }} weeks are saved without sending reminders.</p>
+    <p><a class="btn btn-secondary btn-small" href="{{ url_for('first_timers.import_template') }}">{{ icon("download") }}Download a template</a></p>
+  </aside>
+</div>
+{% endblock %}

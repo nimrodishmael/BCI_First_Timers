@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <p>Service times and message wording go straight into the SMS reminders, so check them before switching on real sending.</p>
+  </div>
+</div>
+
+<nav class="settings-nav" aria-label="Settings sections">
+  <a href="#church">Church and services</a>
+  <a href="#schedule">Reminder schedule</a>
+  <a href="#wording">Message wording</a>
+  <a href="#sms">SMS gateway</a>
+  <a href="#categories">Prayer needs</a>
+  <a href="#users">Staff accounts</a>
+  <a href="#maintenance">Backup</a>
+</nav>
+
+<section class="panel" id="church">
+  <div class="panel-head"><h2>Church and services</h2></div>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="section" value="church">
+    <div class="field-row">
+      <div class="field"><label for="church_name">Church name</label><input type="text" id="church_name" name="church_name" value="{{ settings.church_name }}" required></div>
+      <div class="field"><label for="church_short">Short name</label><input type="text" id="church_short" name="church_short" value="{{ settings.church_short }}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label for="thursday_service_name">Thursday service name</label><input type="text" id="thursday_service_name" name="thursday_service_name" value="{{ settings.thursday_service_name }}"></div>
+      <div class="field"><label for="thursday_service_time">Thursday service starts <span class="hint">As you want it written in the SMS, for example 5:30 PM</span></label><input type="text" id="thursday_service_time" name="thursday_service_time" value="{{ settings.thursday_service_time }}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label for="sunday_service_time">Sunday service starts</label><input type="text" id="sunday_service_time" name="sunday_service_time" value="{{ settings.sunday_service_time }}"></div>
+      <div class="field"><label for="church_location">Church location <span class="hint">Optional, available as {location} in messages</span></label><input type="text" id="church_location" name="church_location" value="{{ settings.church_location }}"></div>
+    </div>
+    <button class="btn" type="submit">Save</button>
+  </form>
+</section>
+
+<section class="panel" id="schedule">
+  <div class="panel-head"><h2>Reminder schedule</h2><p>Times are Kenya time</p></div>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="section" value="schedule">
+    <input type="hidden" name="schedule_form" value="1">
+    <div class="field">
+      <label class="check"><input type="checkbox" name="auto_send" value="1" {% if settings.auto_send == "1" %}checked{% endif %}>
+        <span>Send reminders automatically <span class="hint">Untick to pause all automatic reminders, for example during a church holiday. "Send now" on the Messages page still works.</span></span></label>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="thursday_reminder_day">{{ settings.thursday_service_name }} reminder goes out on</label>
+        <select id="thursday_reminder_day" name="thursday_reminder_day">{% for d in WEEKDAYS %}<option value="{{ loop.index0 }}" {% if settings.thursday_reminder_day|int == loop.index0 %}selected{% endif %}>{{ d }}</option>{% endfor %}</select>
+      </div>
+      <div class="field"><label for="thursday_reminder_time">at</label><input type="time" id="thursday_reminder_time" name="thursday_reminder_time" value="{{ settings.thursday_reminder_time }}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="sunday_reminder_day">Sunday service reminder goes out on</label>
+        <select id="sunday_reminder_day" name="sunday_reminder_day">{% for d in WEEKDAYS %}<option value="{{ loop.index0 }}" {% if settings.sunday_reminder_day|int == loop.index0 %}selected{% endif %}>{{ d }}</option>{% endfor %}</select>
+      </div>
+      <div class="field"><label for="sunday_reminder_time">at</label><input type="time" id="sunday_reminder_time" name="sunday_reminder_time" value="{{ settings.sunday_reminder_time }}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="latest_send_time">Don't send after <span class="hint">If the computer was off at the send time, reminders still go out when it's switched on, up to this time</span></label>
+        <input type="time" id="latest_send_time" name="latest_send_time" value="{{ settings.latest_send_time }}">
+      </div>
+      <div class="field">
+        <label for="followup_weeks">Number of weeks to follow up <span class="hint">Each week has one reminder of each kind</span></label>
+        <input type="number" id="followup_weeks" name="followup_weeks" min="1" max="12" value="{{ settings.followup_weeks }}">
+      </div>
+    </div>
+    <button class="btn" type="submit">Save schedule</button>
+  </form>
+</section>
+
+<section class="panel" id="wording">
+  <div class="panel-head"><h2>Message wording</h2><p>Words in curly brackets are filled in for each person</p></div>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="section" value="wording">
+    <div class="grid grid-2">
+      {% for key, title in [("thursday", settings.thursday_service_name ~ " reminder"), ("sunday", "Sunday service reminder")] %}
+      <div>
+        <div class="field">
+          <label for="template_{{ key }}">{{ title }}</label>
+          <textarea id="template_{{ key }}" name="template_{{ key }}" rows="5" data-sms-count="#count_{{ key }}" data-preview="#preview_{{ key }}">{{ settings["template_" ~ key] }}</textarea>
+          <div class="placeholders">
+            <button type="button" data-insert="{first_name}" data-target="#template_{{ key }}">First name</button>
+            <button type="button" data-insert="{church}" data-target="#template_{{ key }}">Church name</button>
+            {% if key == "thursday" %}
+            <button type="button" data-insert="{thursday_service}" data-target="#template_{{ key }}">Service name</button>
+            <button type="button" data-insert="{thursday_time}" data-target="#template_{{ key }}">Thursday time</button>
+            {% else %}
+            <button type="button" data-insert="{sunday_time}" data-target="#template_{{ key }}">Sunday time</button>
+            {% endif %}
+            <button type="button" data-insert="{location}" data-target="#template_{{ key }}">Location</button>
+          </div>
+          <p class="counter" id="count_{{ key }}"></p>
+        </div>
+        <p class="bubble" id="preview_{{ key }}">{{ previews[key] }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    <button class="btn" type="submit">Save wording</button>
+  </form>
+</section>
+
+<section class="panel" id="sms">
+  <div class="panel-head"><h2>SMS gateway</h2></div>
+  <dl class="facts" style="margin-bottom:18px">
+    <dt>Sending through</dt><dd><strong>{{ provider.label }}</strong></dd>
+    {% if provider.name != "test" %}
+    <dt>Username</dt><dd>{{ config.AT_USERNAME or "Not set" }}</dd>
+    <dt>Sender ID</dt><dd>{{ config.AT_SENDER_ID or "Africa's Talking shared sender" }}</dd>
+    {% endif %}
+  </dl>
+  <p class="small muted">These details live in the <span class="code">.env</span> file next to <span class="code">start.bat</span>, so the API key never appears on screen. Edit that file and restart the app to change them.</p>
+  <form method="post" action="{{ url_for('settings.test_sms') }}" class="inline-form" data-once>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="test_phone" class="small">Send a test to</label><input type="tel" id="test_phone" name="phone" placeholder="0712 345 678" required></div>
+    <div class="field">
+      <label for="test_template" class="small">Using</label>
+      <select id="test_template" name="template"><option value="thursday">{{ settings.thursday_service_name }} reminder</option><option value="sunday">Sunday reminder</option></select>
+    </div>
+    <button class="btn btn-secondary" type="submit" data-busy="Sending...">Send test SMS</button>
+  </form>
+</section>
+
+<section class="panel" id="categories">
+  <div class="panel-head"><h2>Prayer needs</h2><p>The tick-boxes on the entry form</p></div>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="section" value="categories">
+    <div class="field">
+      <label for="prayer_categories">Categories <span class="hint">Separate with commas. Renaming one doesn't change records already saved.</span></label>
+      <textarea id="prayer_categories" name="prayer_categories" rows="2">{{ settings.prayer_categories }}</textarea>
+    </div>
+    <button class="btn" type="submit">Save</button>
+  </form>
+</section>
+
+<section class="panel" id="users">
+  <div class="panel-head"><h2>Staff accounts</h2><p>Admins can change settings and delete records. Staff can do everything else.</p></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">Name</th><th scope="col">Username</th><th scope="col">Role</th><th scope="col">Last signed in</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr{% if not u.active %} style="opacity:.6"{% endif %}>
+          <td>{{ u.full_name }}{% if not u.active %}<span class="sub">Disabled</span>{% endif %}</td>
+          <td>{{ u.username }}</td>
+          <td>{{ "Admin" if u.role == "admin" else "Staff" }}</td>
+          <td class="small">{{ u.last_login|nicetime or "Never" }}</td>
+          <td>
+            <details>
+              <summary class="small">Manage</summary>
+              <form method="post" action="{{ url_for('settings.update_user', user_id=u.id) }}" class="inline-form" style="margin-top:8px">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="action" value="reset">
+                <div class="field"><label class="small" for="pw{{ u.id }}">New password</label><input type="password" id="pw{{ u.id }}" name="password" minlength="8" autocomplete="new-password"></div>
+                <button class="btn btn-secondary btn-small" type="submit">Reset</button>
+              </form>
+              {% if u.id != g.user.id %}
+              <form method="post" action="{{ url_for('settings.update_user', user_id=u.id) }}" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="btn btn-secondary btn-small" name="action" value="{{ 'make_staff' if u.role == 'admin' else 'make_admin' }}">{{ "Make staff" if u.role == "admin" else "Make admin" }}</button>
+                <button class="btn btn-secondary btn-small" name="action" value="{{ 'deactivate' if u.active else 'activate' }}">{{ "Disable account" if u.active else "Enable account" }}</button>
+              </form>
+              {% endif %}
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <h3 style="margin:22px 0 12px">Add a staff member</h3>
+  <form method="post" action="{{ url_for('settings.add_user') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field-row">
+      <div class="field"><label for="nu_name">Name</label><input type="text" id="nu_name" name="full_name" required></div>
+      <div class="field"><label for="nu_user">Username</label><input type="text" id="nu_user" name="username" required autocomplete="off"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label for="nu_pw">Password <span class="hint">At least 8 characters. They can change it after signing in.</span></label><input type="password" id="nu_pw" name="password" minlength="8" required autocomplete="new-password"></div>
+      <div class="field"><label for="nu_role">Role</label><select id="nu_role" name="role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+    </div>
+    <button class="btn" type="submit">Add staff member</button>
+  </form>
+</section>
+
+<section class="panel" id="maintenance">
+  <div class="panel-head"><h2>Backup</h2></div>
+  <p>The records live in one file on this computer. Download a copy every week or two and keep it somewhere else, such as a flash disk or Google Drive.</p>
+  <p><a class="btn btn-secondary" href="{{ url_for('settings.backup') }}">{{ icon("download") }}Download a backup</a></p>
+  <hr style="border:0;border-top:1px solid var(--line-soft);margin:22px 0">
+  <h3 style="margin-bottom:8px">Finished testing?</h3>
+  <p class="small">Messages sent in test mode count towards each person's {{ settings.followup_weeks }} weeks. Before switching to real sending, remove them so everyone starts fresh.</p>
+  <form method="post" action="{{ url_for('settings.clear_simulated') }}" data-confirm="Remove all test-mode messages? Real messages are kept.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn btn-danger btn-small" type="submit">Remove test-mode messages</button>
+  </form>
+</section>
+{% endblock %}

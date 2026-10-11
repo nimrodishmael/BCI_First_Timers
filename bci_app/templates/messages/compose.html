@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Message a group{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="small" style="margin:0 0 6px"><a href="{{ url_for('messages.index') }}">Messages</a></p>
+    <h1>Write a message to a group</h1>
+    <p>For one-off announcements, such as a special service or a crusade. People who opted out of SMS are always left out.</p>
+  </div>
+</div>
+
+<form method="post" class="entry" id="compose" data-once>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="confirm" id="confirm" value="">
+  <div class="panel">
+    <fieldset>
+      <legend>Who should get it?</legend>
+      <div class="choices">
+        {% set aud = form.get("audience", "followup") %}
+        <label class="choice"><input type="radio" name="audience" value="followup" {% if aud == "followup" %}checked{% endif %}><span>Everyone in follow-up now</span></label>
+        <label class="choice"><input type="radio" name="audience" value="recent" {% if aud == "recent" %}checked{% endif %}><span>First timers from the last few days</span></label>
+        <label class="choice"><input type="radio" name="audience" value="range" {% if aud == "range" %}checked{% endif %}><span>Visited between two dates</span></label>
+        <label class="choice"><input type="radio" name="audience" value="all" {% if aud == "all" %}checked{% endif %}><span>All first timers ever</span></label>
+      </div>
+    </fieldset>
+    <div class="field-row" data-show="recent">
+      <div class="field">
+        <label for="days">Visited in the last how many days?</label>
+        <input type="number" id="days" name="days" min="1" max="365" value="{{ form.get('days', 30) }}">
+      </div>
+    </div>
+    <div class="field-row" data-show="range">
+      <div class="field"><label for="date_from">From</label><input type="date" id="date_from" name="date_from" value="{{ form.get('date_from', '') }}"></div>
+      <div class="field"><label for="date_to">To</label><input type="date" id="date_to" name="date_to" value="{{ form.get('date_to', '') }}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="born_again">Born again</label>
+        <select id="born_again" name="born_again">
+          <option value="">Any answer</option>
+          {% for key, label in BORN_AGAIN.items() %}<option value="{{ key }}" {% if form.get('born_again') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="service">First came to</label>
+        <select id="service" name="service">
+          <option value="">Any service</option>
+          {% for key, label in SERVICES.items() %}<option value="{{ key }}" {% if form.get('service') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="message">Message</label>
+      <textarea id="message" name="message" rows="5" data-sms-count="#count" data-preview="#preview" required>{{ form.get('message', '') }}</textarea>
+      <div class="placeholders">
+        <button type="button" data-insert="{first_name}" data-target="#message">Their first name</button>
+        <button type="button" data-insert="{church}" data-target="#message">Church name</button>
+        <button type="button" data-insert="{sunday_time}" data-target="#message">Sunday time</button>
+        <button type="button" data-insert="{thursday_time}" data-target="#message">Thursday time</button>
+      </div>
+      <p class="counter" id="count"></p>
+    </div>
+    <div class="field">
+      <label for="note">Label for the history <span class="hint">Optional, for example "Crusade invite"</span></label>
+      <input type="text" id="note" name="note" value="{{ form.get('note', '') }}" maxlength="80">
+    </div>
+
+    <div class="form-actions">
+      <button class="btn" type="submit" id="send-btn" data-busy="Sending..." disabled>Send</button>
+      <span class="small muted" id="aud-count" aria-live="polite">Counting recipients...</span>
+    </div>
+  </div>
+
+  <aside class="aside-note">
+    <h2>Preview</h2>
+    <p class="bubble" id="preview" style="margin:0">{{ preview or "Your message will appear here." }}</p>
+    <p class="small" style="margin-top:12px">Shown for someone called Grace. Each person sees their own first name.</p>
+  </aside>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById("compose");
+  const out = document.getElementById("aud-count");
+  const btn = document.getElementById("send-btn");
+  const confirmField = document.getElementById("confirm");
+  let count = 0, timer;
+
+  function toggle() {
+    const aud = form.querySelector("input[name=audience]:checked").value;
+    form.querySelectorAll("[data-show]").forEach((el) => { el.hidden = el.dataset.show !== aud; });
+  }
+  function refresh() {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const params = new URLSearchParams(new FormData(form));
+      params.delete("csrf_token"); params.delete("message"); params.delete("note");
+      fetch("{{ url_for('messages.audience_count') }}?" + params).then((r) => r.json()).then((d) => {
+        count = d.count;
+        confirmField.value = String(count);
+        out.textContent = count === 0 ? "Nobody matches this group." :
+          `Goes to ${count} ${count === 1 ? "person" : "people"}` + (d.sample.length ? ` (${d.sample.join(", ")}${count > d.sample.length ? ", ..." : ""})` : "");
+        btn.disabled = count === 0 || !form.message.value.trim();
+        btn.textContent = count ? `Send to ${count} ${count === 1 ? "person" : "people"}` : "Send";
+      });
+    }, 200);
+  }
+  form.addEventListener("change", () => { toggle(); refresh(); });
+  form.message.addEventListener("input", () => { btn.disabled = count === 0 || !form.message.value.trim(); });
+  form.addEventListener("submit", (e) => {
+    if (!window.confirm(`Send this message to ${count} ${count === 1 ? "person" : "people"}?`)) {
+      e.preventDefault(); e.stopImmediatePropagation();
+    }
+  }, true);
+  toggle(); refresh();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% set th = schedule[0] %}{% set su = schedule[1] %}
+<section class="hero" aria-labelledby="hero-title">
+  {{ rays(56, 60, 520) }}
+  <img class="hero-logo" src="{{ url_for('static', filename='img/logo-320.png') }}" alt="">
+  <h1 id="hero-title">
+    {% if kpis.in_followup == 0 %}Nobody is in follow-up right now
+    {% elif kpis.in_followup == 1 %}1 first timer is in follow-up
+    {% else %}{{ kpis.in_followup }} first timers are in follow-up{% endif %}
+  </h1>
+  <p class="hero-lede">Each one gets an invitation every {{ WEEKDAYS[settings.thursday_reminder_day|int] }} and {{ WEEKDAYS[settings.sunday_reminder_day|int] }} for {{ settings.followup_weeks }} weeks after their first visit.</p>
+  <div class="sends">
+    {% for s in schedule %}
+    <div class="send">
+      <p class="send-when">{{ icon("clock") }}
+        {% if s.window_open %}Sending today until {{ settings.latest_send_time }}
+        {% elif s.at %}{{ s.at.strftime("%A %d %B")|replace(" 0", " ") }} at {{ s.at.strftime("%H:%M") }}{% endif %}
+      </p>
+      <p class="send-what">{{ settings.thursday_service_name if s.campaign == "thursday" else "Sunday service" }} reminder</p>
+      <p class="send-who">
+        {% if s.window_open %}{{ s.sent_today }} sent today{% if s.due %}, {{ s.due }} still due{% endif %}.
+        {% elif s.due %}Due to go to {{ s.due }} {{ "person" if s.due == 1 else "people" }}.
+        {% else %}Nobody due yet.{% endif %}
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="hero-foot">
+    {% if settings.auto_send != "1" %}
+    <span class="beat off">Automatic sending is switched off in Settings</span>
+    {% elif scheduler_ok %}
+    <span class="beat">Automatic sending is on</span>
+    {% else %}
+    <span class="beat off">The reminder scheduler hasn't checked in{% if scheduler_tick %} since {{ scheduler_tick|nicetime }}{% endif %}. Start the app with start.bat.</span>
+    {% endif %}
+    <a href="{{ url_for('messages.index') }}">Go to messages</a>
+  </div>
+</section>
+
+<section class="stats" aria-label="Key numbers">
+  <div class="stat">
+    <p class="stat-label">New this month</p>
+    <p class="stat-value">{{ kpis.this_month }}</p>
+    <p class="stat-note">{{ kpis.last_month }} in {{ kpis.last_month_name }}</p>
+  </div>
+  <div class="stat">
+    <p class="stat-label">In follow-up now</p>
+    <p class="stat-value">{{ kpis.in_followup }}</p>
+    <p class="stat-note">Getting weekly reminders</p>
+  </div>
+  <div class="stat">
+    <p class="stat-label">Came back</p>
+    <p class="stat-value">{{ kpis.came_back_pct }}%</p>
+    <p class="stat-note">{{ kpis.came_back }} of {{ total }}, {{ ranges[rng]|lower }}</p>
+  </div>
+  <div class="stat">
+    <p class="stat-label">Born again</p>
+    <p class="stat-value">{{ kpis.born_again_pct }}%</p>
+    <p class="stat-note">Of {{ kpis.answered }} who answered</p>
+  </div>
+  <div class="stat">
+    <p class="stat-label">SMS this month</p>
+    <p class="stat-value">{{ kpis.sms_ok }}</p>
+    <p class="stat-note">{% if kpis.sms_bad %}{{ kpis.sms_bad }} failed{% else %}None failed{% endif %}{% if sms_mode == "test" %}, test mode{% endif %}</p>
+  </div>
+</section>
+
+<div class="page-head" style="margin-bottom:14px">
+  <h2>Trends</h2>
+  <nav class="range-tabs" aria-label="Time range">
+    {% for key, label in ranges.items() %}
+    <a href="{{ url_for('dashboard.index', range=key) }}" {% if rng == key %}aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+</div>
+
+<div class="grid grid-wide">
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>First timers by {{ chart.mode }}</h2><p>{{ total }} in total, {{ ranges[rng]|lower }}</p></div>
+    </div>
+    <ul class="legend">
+      <li><span class="swatch" style="background:#2f4beb"></span>Sunday service</li>
+      <li><span class="swatch" style="background:#a8821f"></span>{{ settings.thursday_service_name }}</li>
+      <li><span class="swatch" style="background:#1f9e8f"></span>Other events</li>
+    </ul>
+    <div class="chart-box"><canvas id="arrivals" role="img" aria-label="Column chart of first timers per {{ chart.mode }}, split by service"></canvas></div>
+    <details class="small" style="margin-top:10px">
+      <summary>Show as a table</summary>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">{{ chart.mode|capitalize }} starting</th><th scope="col">Sunday</th><th scope="col">Dominion</th><th scope="col">Other</th></tr></thead>
+        <tbody>{% for i in range(chart.labels|length) %}<tr><td>{{ chart.labels[i] }}</td><td class="num">{{ chart.sunday[i] }}</td><td class="num">{{ chart.thursday[i] }}</td><td class="num">{{ chart.other[i] }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><div><h2>How follow-up is going</h2><p>Of everyone who visited, {{ ranges[rng]|lower }}</p></div></div>
+    {% set top = funnel[0][1] or 1 %}
+    <ol class="funnel">
+      {% for label, n in funnel %}
+      <li>
+        <div class="row"><span>{{ label }}</span><strong class="num">{{ n }}{% if loop.index > 1 and funnel[0][1] %} <span class="muted" style="font-weight:400">{{ (100 * n / funnel[0][1])|round|int }}%</span>{% endif %}</strong></div>
+        <div class="track" title="{{ label }}: {{ n }}"><div class="fill" style="width: {{ (100 * n / top)|round(1) }}%"></div></div>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+</div>
+
+<div class="grid grid-3" style="margin-top:20px">
+  <section class="panel">
+    <div class="panel-head"><div><h2>Where they stay</h2><p>Top areas</p></div></div>
+    {% if top_places %}
+    {% set maxp = top_places[0][1] %}
+    <ul class="bars">
+      {% for name, n in top_places %}
+      <li title="{{ name }}: {{ n }}"><span class="bar-label">{{ name }}</span><span class="bar-value">{{ n }}</span><span class="bar-track"><span class="bar-fill" style="display:block;width:{{ (100 * n / maxp)|round(1) }}%"></span></span></li>
+      {% endfor %}
+    </ul>
+    <p class="small muted" style="margin:12px 0 0">{% if other_places %}{{ other_places }} more in other areas. {% endif %}{% if no_place %}{{ no_place }} didn't say.{% endif %}</p>
+    {% else %}<p class="muted">No locations recorded in this period.</p>{% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><div><h2>Prayer needs</h2><p>From the categories ticked on entry</p></div><a class="small" href="{{ url_for('prayer.index') }}">Prayer list</a></div>
+    {% if prayer %}
+    {% set maxq = prayer[0][1] %}
+    <ul class="bars gold">
+      {% for name, n in prayer %}
+      <li title="{{ name }}: {{ n }}"><span class="bar-label">{{ name }}</span><span class="bar-value">{{ n }}</span><span class="bar-track"><span class="bar-fill" style="display:block;width:{{ (100 * n / maxq)|round(1) }}%"></span></span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">No prayer needs ticked in this period.</p>{% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><div><h2>Born again</h2><p>As answered on the card</p></div></div>
+    {% set bt = (born.get('yes', 0) + born.get('no', 0) + born.get('unsure', 0) + born.get('blank', 0)) %}
+    {% if bt %}
+    {% set parts = [("yes", "Yes", "#2f4beb"), ("no", "No", "#a8821f"), ("unsure", "Not sure", "#1f9e8f"), ("blank", "Left blank", "#c3c9dc")] %}
+    <div class="stackbar" role="img" aria-label="Born again answers: {% for k, l, c in parts %}{{ l }} {{ born.get(k, 0) }}{{ ', ' if not loop.last }}{% endfor %}">
+      {% for k, l, c in parts if born.get(k, 0) %}<span style="width:{{ (100 * born.get(k, 0) / bt)|round(1) }}%;background:{{ c }}" title="{{ l }}: {{ born.get(k, 0) }}"></span>{% endfor %}
+    </div>
+    <ul class="keyrows">
+      {% for k, l, c in parts %}
+      <li><span class="k"><span class="swatch" style="background:{{ c }}"></span>{{ l }}</span><span class="num"><strong>{{ born.get(k, 0) }}</strong> <span class="muted">{{ (100 * born.get(k, 0) / bt)|round|int }}%</span></span></li>
+      {% endfor %}
+    </ul>
+    {% if born.get('no', 0) + born.get('unsure', 0) %}
+    <p class="small" style="margin:14px 0 0"><a href="{{ url_for('first_timers.index', born_again='no') }}">See who said no</a> for salvation follow-up.</p>
+    {% endif %}
+    {% else %}<p class="muted">No first timers in this period.</p>{% endif %}
+  </section>
+</div>
+
+<div class="grid grid-2 grid-top" style="margin-top:20px">
+  <section class="panel">
+    <div class="panel-head"><h2>Needs attention</h2></div>
+    <ul class="attention">
+      {% if attention.failed %}
+      <li>{{ icon("alert") }}<span>{{ attention.failed }} {{ "person's" if attention.failed == 1 else "people's" }} messages failed in the last two weeks. <a href="{{ url_for('messages.index') }}">Check and resend</a></span></li>
+      {% endif %}
+      {% if attention.no_phone %}
+      <li>{{ icon("alert") }}<span>{{ attention.no_phone }} in follow-up {{ "has" if attention.no_phone == 1 else "have" }} no phone number. <a href="{{ url_for('first_timers.index', status='no_phone') }}">Add numbers</a></span></li>
+      {% endif %}
+      {% if attention.paused %}
+      <li>{{ icon("pause") }}<span>{{ attention.paused }} {{ "has" if attention.paused == 1 else "have" }} reminders paused. <a href="{{ url_for('first_timers.index', status='paused') }}">Review</a></span></li>
+      {% endif %}
+      {% if not (attention.failed or attention.no_phone or attention.paused) %}
+      <li class="ok">{{ icon("check") }}<span>Nothing needs attention. Every message went through.</span></li>
+      {% endif %}
+    </ul>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Recently added</h2><a class="small" href="{{ url_for('first_timers.index') }}">See all</a></div>
+    {% if recent %}
+    <div class="table-wrap"><table>
+      <tbody>
+        {% for r in recent %}
+        <tr>
+          <td class="name"><a href="{{ url_for('first_timers.detail', ft_id=r.id) }}">{{ r.first_name }} {{ r.other_names or "" }}</a>{% if r.residence %}<span class="sub">{{ r.residence }}</span>{% endif %}</td>
+          <td class="nowrap small">{{ r.visit_date|nicedate("%d %b") }}</td>
+          <td class="small">{{ BORN_AGAIN.get(r.born_again, "") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+    <p class="muted">No first timers yet. <a href="{{ url_for('first_timers.new') }}">Add the first card</a>.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+  window.BCI_ARRIVALS = {{ chart|tojson }};
+  window.BCI_THURSDAY_NAME = {{ settings.thursday_service_name|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

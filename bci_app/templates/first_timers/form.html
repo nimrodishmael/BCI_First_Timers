@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field_error %}
+{% block title %}{{ "Edit " ~ editing.first_name if editing else "Add first timer" }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    {% if editing %}
+    <h1>Edit {{ editing.first_name }} {{ editing.other_names or "" }}</h1>
+    {% else %}
+    <h1>Add a first timer</h1>
+    <p>Type in each card as it was filled. After saving, the form clears and keeps the same date and service, ready for the next card.</p>
+    {% endif %}
+  </div>
+  {% if not editing %}
+  <div class="page-actions">
+    <a class="btn btn-secondary" href="{{ url_for('first_timers.import_csv') }}">{{ icon("upload") }}Import from a spreadsheet</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="entry">
+  <form method="post" class="panel" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    {% if dupes %}
+    <div class="dupe" role="alert">
+      <strong>This phone number is already in the system.</strong>
+      <ul>
+        {% for d in dupes %}
+        <li><a href="{{ url_for('first_timers.detail', ft_id=d.id) }}" target="_blank">{{ d.first_name }} {{ d.other_names or "" }}</a>, first visited {{ d.visit_date|nicedate }}</li>
+        {% endfor %}
+      </ul>
+      <p class="small">If it's the same person coming back, open their record and add a return visit instead. If it's someone else sharing the phone, save anyway.</p>
+      <label class="check"><input type="checkbox" name="confirm_duplicate" value="1"> Save as a new first timer anyway</label>
+    </div>
+    {% endif %}
+
+    <div class="batch-bar">
+      <div class="field">
+        <label for="visit_date">Date they visited</label>
+        <input type="date" id="visit_date" name="visit_date" value="{{ values.get('visit_date', '') }}" max="{{ now.date().isoformat() }}" required
+               {% if errors.visit_date %}aria-invalid="true" aria-describedby="visit_date-error"{% endif %}>
+        {{ field_error(errors, "visit_date") }}
+      </div>
+      <div class="field">
+        <label for="service">Service</label>
+        <select id="service" name="service">
+          {% for key, label in SERVICES.items() %}
+          <option value="{{ key }}" {% if values.get('service') == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="first_name">First name</label>
+        <input type="text" id="first_name" name="first_name" value="{{ values.get('first_name') or '' }}" required autocomplete="off"
+               {% if not editing and not dupes %}autofocus{% endif %}
+               {% if errors.first_name %}aria-invalid="true" aria-describedby="first_name-error"{% endif %}>
+        {{ field_error(errors, "first_name") }}
+      </div>
+      <div class="field">
+        <label for="other_names">Other names</label>
+        <input type="text" id="other_names" name="other_names" value="{{ values.get('other_names') or '' }}" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="phone">Phone number <span class="hint">Needed for the SMS reminders</span></label>
+        <input type="tel" id="phone" name="phone" value="{{ values.get('phone') or '' }}" placeholder="0712 345 678" autocomplete="off" inputmode="tel"
+               {% if errors.phone %}aria-invalid="true" aria-describedby="phone-error"{% endif %}>
+        {{ field_error(errors, "phone") }}
+      </div>
+      <div class="field">
+        <label for="residence">Where they stay <span class="hint">Estate or area, for example Bamburi</span></label>
+        <input type="text" id="residence" name="residence" value="{{ values.get('residence') or '' }}" list="places" autocomplete="off">
+        <datalist id="places"></datalist>
+      </div>
+    </div>
+
+    <fieldset>
+      <legend>Born again?</legend>
+      <div class="choices">
+        {% for key, label in BORN_AGAIN.items() %}
+        <label class="choice"><input type="radio" name="born_again" value="{{ key }}" {% if values.get('born_again') == key %}checked{% endif %}><span>{{ label }}</span></label>
+        {% endfor %}
+        <label class="choice"><input type="radio" name="born_again" value="" {% if not values.get('born_again') %}checked{% endif %}><span>Left blank</span></label>
+      </div>
+    </fieldset>
+
+    <div class="field">
+      <label for="prayer_points">Prayer points</label>
+      <textarea id="prayer_points" name="prayer_points" rows="4">{{ values.get('prayer_points') or '' }}</textarea>
+    </div>
+
+    {% if categories %}
+    <fieldset>
+      <legend>Prayer needs <span class="hint">Tick what the prayer points are about. This feeds the dashboard and the prayer list.</span></legend>
+      <div class="choices">
+        {% for c in categories %}
+        <label class="choice"><input type="checkbox" name="prayer_categories" value="{{ c }}" {% if c in values.get('categories_list', []) %}checked{% endif %}><span>{{ c }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    {% endif %}
+
+    <div class="field">
+      <label class="check"><input type="checkbox" name="sms_consent" value="1" {% if values.get('sms_consent') %}checked{% endif %}>
+        <span>Send them SMS reminders <span class="hint">Untick if they asked not to be contacted by SMS.</span></span></label>
+    </div>
+
+    <div class="field">
+      <label for="notes">Office notes <span class="hint">Optional, only staff see this</span></label>
+      <textarea id="notes" name="notes" rows="2">{{ values.get('notes') or '' }}</textarea>
+    </div>
+
+    <div class="form-actions">
+      {% if editing %}
+      <button class="btn" type="submit">Save changes</button>
+      <a class="btn btn-secondary" href="{{ url_for('first_timers.detail', ft_id=editing.id) }}">Cancel</a>
+      {% else %}
+      <button class="btn" type="submit" name="action" value="another">Save and add another</button>
+      <button class="btn btn-secondary" type="submit" name="action" value="view">Save and view record</button>
+      {% endif %}
+    </div>
+  </form>
+
+  <aside class="aside-note">
+    <h2>What happens next</h2>
+    <ol>
+      <li>On {{ WEEKDAYS[settings.thursday_reminder_day|int] }} at {{ settings.thursday_reminder_time }}, they get an invitation to the {{ settings.thursday_service_name }}.</li>
+      <li>On {{ WEEKDAYS[settings.sunday_reminder_day|int] }} at {{ settings.sunday_reminder_time }}, they get an invitation to Sunday service.</li>
+      <li>This repeats for {{ settings.followup_weeks }} weeks, then their follow-up is marked complete.</li>
+    </ol>
+    <p class="small" style="margin-top:12px">When they come back to church, open their record and add a return visit. That's how the dashboard knows follow-up is working.</p>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  // Suggest estates the office has typed before, so spellings stay consistent.
+  fetch("{{ url_for('first_timers.places') }}").then(r => r.json()).then(list => {
+    const dl = document.getElementById("places");
+    list.forEach(p => { const o = document.createElement("option"); o.value = p; dl.appendChild(o); });
+  }).catch(() => {});
+</script>
+{% endblock %}

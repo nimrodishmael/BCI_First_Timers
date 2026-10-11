@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_pill, msg_status %}
+{% block title %}{{ ft.first_name }} {{ ft.other_names or "" }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="small" style="margin:0 0 6px"><a href="{{ url_for('first_timers.index') }}">First timers</a></p>
+    <h1>{{ ft.first_name }} {{ ft.other_names or "" }}</h1>
+    <p>First visited {{ ft.visit_date|nicedate("%A %d %B %Y") }}. {{ SERVICES.get(ft.service, ft.service) }}.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-secondary" href="{{ url_for('first_timers.edit', ft_id=ft.id) }}">Edit details</a>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div>
+    <section class="panel">
+      <dl class="facts">
+        <dt>Phone</dt><dd class="num">{{ ft.phone|phone or "No phone number. They won't receive SMS." }}</dd>
+        <dt>Where they stay</dt><dd>{{ ft.residence or "Not given" }}</dd>
+        <dt>Born again</dt><dd>{{ BORN_AGAIN.get(ft.born_again, "Left blank") }}</dd>
+        <dt>Member</dt><dd>{{ "Yes" if ft.is_member else "Not yet" }}</dd>
+        {% if ft.prayer_categories %}
+        <dt>Prayer needs</dt>
+        <dd><span class="tags">{% for c in ft.prayer_categories.split(",") if c.strip() %}<span class="tag">{{ c.strip() }}</span>{% endfor %}</span></dd>
+        {% endif %}
+        <dt>Prayer points</dt>
+        <dd>{% if ft.prayer_points %}<p class="prayer-text">{{ ft.prayer_points }}</p>{% else %}None written{% endif %}</dd>
+        {% if ft.notes %}<dt>Office notes</dt><dd style="white-space:pre-wrap">{{ ft.notes }}</dd>{% endif %}
+        <dt>Entered</dt><dd class="small muted">{{ ft.created_at|nicetime }}{% if creator %} by {{ creator.full_name }}{% endif %}</dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Messages sent</h2><p>{{ messages|length }} so far</p></div>
+      {% if messages %}
+      <ul class="timeline">
+        {% for m in messages %}
+        <li>
+          <div class="meta"><span>{{ {"thursday": "Thursday reminder", "sunday": "Sunday reminder", "broadcast": "Custom message", "test": "Test"}.get(m.campaign, m.campaign) }}, {{ m.created_at|nicetime }}</span>{{ msg_status(m.status) }}</div>
+          <p class="body">{{ m.body }}</p>
+          {% if m.error %}<p class="err">{{ m.error }}</p>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">No messages yet. The first reminder goes out on the next {{ WEEKDAYS[settings.thursday_reminder_day|int] }} or {{ WEEKDAYS[settings.sunday_reminder_day|int] }}, whichever comes first.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div>
+    <section class="panel">
+      <div class="panel-head"><h2>Follow-up</h2>{{ status_pill(ft.sms_status) }}</div>
+      <div class="prog-row">
+        <span class="small">{{ settings.thursday_service_name }} reminders: {{ [prog.thursday, prog.weeks]|min }} of {{ prog.weeks }}</span>
+        <div class="dots" aria-hidden="true">{% for i in range(prog.weeks) %}<span class="{{ 'done' if i < prog.thursday }}"></span>{% endfor %}</div>
+      </div>
+      <div class="prog-row">
+        <span class="small">Sunday service reminders: {{ [prog.sunday, prog.weeks]|min }} of {{ prog.weeks }}</span>
+        <div class="dots gold" aria-hidden="true">{% for i in range(prog.weeks) %}<span class="{{ 'done' if i < prog.sunday }}"></span>{% endfor %}</div>
+      </div>
+      <div class="actions-list" style="margin-top:18px">
+        {% if ft.sms_status == "active" %}
+        <form method="post" action="{{ url_for('first_timers.set_sms_status', ft_id=ft.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn btn-secondary" name="action" value="pause">{{ icon("pause") }}Pause reminders</button>
+        </form>
+        {% elif ft.sms_status in ("paused", "opted_out") %}
+        <form method="post" action="{{ url_for('first_timers.set_sms_status', ft_id=ft.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn btn-secondary" name="action" value="resume">{{ icon("clock") }}Resume reminders</button>
+        </form>
+        {% endif %}
+        {% if ft.sms_status != "opted_out" %}
+        <form method="post" action="{{ url_for('first_timers.set_sms_status', ft_id=ft.id) }}" data-confirm="Stop all SMS to {{ ft.first_name }}? Use this if they asked not to be texted.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn btn-secondary" name="action" value="opt_out">{{ icon("stop") }}They asked to stop SMS</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('first_timers.toggle_member', ft_id=ft.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn btn-secondary">{{ icon("people") }}{{ "Unmark as member" if ft.is_member else "Mark as a church member" }}</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Came back</h2><p>{{ visits|length }} return {{ "visit" if visits|length == 1 else "visits" }}</p></div>
+      <form class="inline-form" method="post" action="{{ url_for('first_timers.add_visit', ft_id=ft.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field">
+          <label for="rv_date" class="small">Date</label>
+          <input type="date" id="rv_date" name="visit_date" value="{{ default_return if default_return > ft.visit_date else now.date().isoformat() }}" min="{{ ft.visit_date }}" max="{{ now.date().isoformat() }}" required>
+        </div>
+        <div class="field">
+          <label for="rv_service" class="small">Service</label>
+          <select id="rv_service" name="service">{% for key, label in SERVICES.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+        </div>
+        <button class="btn" type="submit">Add visit</button>
+      </form>
+      {% if visits %}
+      <ul class="timeline" style="margin-top:16px">
+        {% for v in visits %}
+        <li class="meta" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <span>{{ v.visit_date|nicedate("%a %d %b %Y") }}. {{ SERVICES.get(v.service, v.service) }}</span>
+          <form method="post" action="{{ url_for('first_timers.delete_visit', ft_id=ft.id, visit_id=v.id) }}" data-confirm="Remove this return visit?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="linklike small" type="submit">Remove</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+
+    {% if g.user.role == "admin" %}
+    <section class="panel">
+      <form method="post" action="{{ url_for('first_timers.delete', ft_id=ft.id) }}" data-confirm="Delete {{ ft.first_name }} and all their messages? This can't be undone.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-danger btn-small" type="submit">Delete this record</button>
+      </form>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

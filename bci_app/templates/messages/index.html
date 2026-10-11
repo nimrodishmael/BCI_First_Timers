@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Messages</h1>
+    <p>Reminders go out automatically while the app is running. You can also send a reminder straight away, or write a one-off message to a group.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn" href="{{ url_for('messages.compose') }}">{{ icon("message") }}Write a message to a group</a>
+  </div>
+</div>
+
+<section class="panel provider" style="margin-bottom:20px">
+  <div>
+    <strong>{{ provider.label }}</strong>
+    {% if provider.name == "test" %}
+    <p class="small muted" style="margin:2px 0 0">Messages are recorded here but nobody receives them. To send for real, add your Africa's Talking details to the <span class="code">.env</span> file and restart. The README explains how.</p>
+    {% else %}
+    <p class="small muted" style="margin:2px 0 0">{% if balance %}Balance: <strong>{{ balance }}</strong>{% else %}<a href="{{ url_for('messages.index', balance=1) }}">Check SMS balance</a>{% endif %}</p>
+    {% endif %}
+  </div>
+  <p class="small" style="margin:0">This month: <strong>{{ totals.ok or 0 }}</strong> delivered to the network{% if totals.bad %}, <strong style="color:var(--red)">{{ totals.bad }}</strong> failed{% endif %}</p>
+</section>
+
+<div class="sched">
+  {% for s in schedule %}
+  <section class="panel">
+    <h2>{{ settings.thursday_service_name if s.campaign == "thursday" else "Sunday service" }} reminder</h2>
+    <p class="sched-when">{{ icon("clock") }}
+      {% if s.window_open %}Sending today, {{ s.at.strftime("%H:%M") }} to {{ settings.latest_send_time }}
+      {% elif s.at %}Next: {{ s.at.strftime("%A %d %B")|replace(" 0", " ") }} at {{ s.at.strftime("%H:%M") }}{% endif %}
+    </p>
+    <p class="bubble">{{ s.preview }}</p>
+    <div class="foot">
+      <span class="small">
+        {% if s.window_open %}{{ s.sent_today }} sent today. {{ s.due }} still due.
+        {% else %}{{ s.due }} {{ "person is" if s.due == 1 else "people are" }} due on that day.{% endif %}
+        {% if s.last %}<br><span class="muted">Last sent {{ s.last.run_date|nicedate("%a %d %b") }} to {{ s.last.recipients }}{% if s.last.failed %}, {{ s.last.failed }} failed{% endif %}</span>{% endif %}
+      </span>
+      {% if s.today_is_day %}
+      <form method="post" action="{{ url_for('messages.send_now', campaign=s.campaign) }}" data-once
+            data-confirm="Send the {{ settings.thursday_service_name if s.campaign == 'thursday' else 'Sunday service' }} reminder now to everyone who is due and hasn't had it today?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-secondary btn-small" type="submit" data-busy="Sending...">Send now</button>
+      </form>
+      {% else %}
+      <span class="small muted" title="The message says &quot;tomorrow&quot;, so it only goes out on its own day">Send now is available on {{ s.day_name }}s</span>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+<section class="panel">
+  <div class="panel-head"><h2>History</h2><p>Each row is one batch of messages</p></div>
+  {% if runs %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">When</th><th scope="col">Message</th><th scope="col">How</th><th scope="col">Recipients</th><th scope="col">Result</th></tr></thead>
+      <tbody>
+        {% for r in runs %}
+        <tr>
+          <td class="nowrap"><a href="{{ url_for('messages.run_detail', run_id=r.id) }}">{{ r.started_at|nicetime }}</a></td>
+          <td>{{ campaigns.get(r.campaign, r.campaign) }}{% if r.note %}<span class="sub">{{ r.note }}</span>{% endif %}</td>
+          <td class="small">{{ "Automatic" if r.triggered_by == "auto" else ("Sent by " ~ (r.by_name or "staff")) }}{% if r.provider == "test" %}<span class="sub">Test mode</span>{% endif %}</td>
+          <td class="num">{{ r.recipients }}</td>
+          <td>{% if r.failed %}<span class="pill msg-failed">{{ icon("alert") }}{{ r.failed }} failed</span>{% else %}<span class="pill msg-sent">{{ icon("check") }}All {{ "simulated" if r.provider == "test" else "sent" }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><h2>No messages yet</h2><p>The first reminders will appear here after they go out.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

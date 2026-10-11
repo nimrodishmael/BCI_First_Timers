@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block shell %}
+{{ rays(64, 120, 540, "auth-rays") }}
+<div class="auth-wrap">
+  <main class="auth-card">
+    <img class="logo" src="{{ url_for('static', filename='img/logo-320.png') }}" alt="{{ settings.church_name }} logo">
+    <h1>First timers</h1>
+    <p class="church">{{ settings.church_name }}</p>
+    {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}<p class="flash flash-{{ cat }}">{{ msg }}</p>{% endfor %}
+    {% endwith %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" required autofocus value="{{ request.form.get('username', '') }}">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn" type="submit">Sign in</button>
+    </form>
+  </main>
+</div>
+{% endblock %}

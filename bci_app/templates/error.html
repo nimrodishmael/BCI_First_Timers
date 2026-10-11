@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ "Not found" if code == 404 else "Problem" }}{% endblock %}
+{% block content %}
+<div class="panel empty">
+  <h2>{{ "Not found" if code == 404 else ("Not allowed" if code == 403 else "Something needs fixing") }}</h2>
+  <p>{{ message }}</p>
+  <p><a class="btn btn-secondary" href="{{ url_for('dashboard.index') }}">Go to the dashboard</a></p>
+</div>
+{% endblock %}

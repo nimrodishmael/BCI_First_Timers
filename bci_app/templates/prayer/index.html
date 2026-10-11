@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Prayer list{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Prayer list</h1>
+    <p>Prayer points from first timers who visited between {{ date_from.isoformat()|nicedate("%d %B") }} and {{ date_to.isoformat()|nicedate("%d %B %Y") }}{% if category %}, about {{ category|lower }}{% endif %}. {{ total }} {{ "person" if total == 1 else "people" }}.</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-secondary" type="button" onclick="window.print()">{{ icon("print") }}Print for the prayer team</button>
+  </div>
+</div>
+
+<form class="filters" method="get">
+  <div class="f"><label for="from">From</label><input type="date" id="from" name="from" value="{{ date_from.isoformat() }}"></div>
+  <div class="f"><label for="to">To</label><input type="date" id="to" name="to" value="{{ date_to.isoformat() }}"></div>
+  <div class="f">
+    <label for="category">Prayer need</label>
+    <select id="category" name="category">
+      <option value="">All needs</option>
+      {% for c in categories %}<option value="{{ c }}" {% if c == category %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <button class="btn btn-secondary" type="submit">Show</button>
+</form>
+
+{% if tally %}
+<p class="tags no-print" style="margin-bottom:18px">{% for name, n in tally %}<a class="tag" style="text-decoration:none" href="{{ url_for('prayer.index', **{'from': date_from.isoformat(), 'to': date_to.isoformat(), 'category': name}) }}">{{ name }} {{ n }}</a>{% endfor %}</p>
+{% endif %}
+
+{% if grouped %}
+  {% for day, people in grouped.items() %}
+  <section class="prayer-day">
+    <h2>{{ day|nicedate("%A %d %B") }}</h2>
+    <div class="prayer-cards">
+      {% for p in people %}
+      <article class="prayer-card">
+        <h3>{{ p.first_name }} {{ p.other_names or "" }}</h3>
+        <p class="meta">{{ p.residence or "Area not given" }}{% if p.born_again == "no" %}, not yet born again{% elif p.born_again == "unsure" %}, not sure about salvation{% endif %}</p>
+        {% if p.prayer_points %}<p>{{ p.prayer_points }}</p>{% endif %}
+        {% if p.prayer_categories %}<div class="tags">{% for c in p.prayer_categories.split(",") if c.strip() %}<span class="tag">{{ c.strip() }}</span>{% endfor %}</div>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+{% else %}
+<div class="panel empty">
+  <h2>No prayer points in these dates</h2>
+  <p>Widen the dates, or check that prayer points are being typed in from the cards.</p>
+</div>
+{% endif %}
+{% endblock %}

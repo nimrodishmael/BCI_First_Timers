@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_pill %}
+{% block title %}First timers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>First timers</h1>
+    <p>{{ total }} {{ "person" if total == 1 else "people" }}{% if filters.values()|select|list %} match these filters{% endif %}.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-secondary" href="{{ url_for('first_timers.export_csv', **filters) }}">{{ icon("download") }}Download as CSV</a>
+    <a class="btn" href="{{ url_for('first_timers.new') }}">{{ icon("plus") }}Add first timer</a>
+  </div>
+</div>
+
+<form class="filters" method="get" role="search">
+  <div class="f f-grow">
+    <label for="q">Search</label>
+    <input type="search" id="q" name="q" value="{{ filters.q }}" placeholder="Name, phone or where they stay">
+  </div>
+  <div class="f">
+    <label for="status">Status</label>
+    <select id="status" name="status">
+      <option value="">Everyone</option>
+      {% for key, label in SMS_STATUS.items() %}<option value="{{ key }}" {% if filters.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      <option value="returned" {% if filters.status == 'returned' %}selected{% endif %}>Came back</option>
+      <option value="member" {% if filters.status == 'member' %}selected{% endif %}>Members</option>
+      <option value="no_phone" {% if filters.status == 'no_phone' %}selected{% endif %}>No phone number</option>
+    </select>
+  </div>
+  <div class="f">
+    <label for="born_again">Born again</label>
+    <select id="born_again" name="born_again">
+      <option value="">Any answer</option>
+      {% for key, label in BORN_AGAIN.items() %}<option value="{{ key }}" {% if filters.born_again == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      <option value="blank" {% if filters.born_again == 'blank' %}selected{% endif %}>Left blank</option>
+    </select>
+  </div>
+  <div class="f">
+    <label for="service">Service</label>
+    <select id="service" name="service">
+      <option value="">Any service</option>
+      {% for key, label in SERVICES.items() %}<option value="{{ key }}" {% if filters.service == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="f">
+    <label for="month">Month</label>
+    <select id="month" name="month">
+      <option value="">All months</option>
+      {% for m in months %}<option value="{{ m }}" {% if filters.month == m %}selected{% endif %}>{{ (m ~ "-01")|nicedate("%B %Y") }}</option>{% endfor %}
+    </select>
+  </div>
+  <button class="btn btn-secondary" type="submit">Filter</button>
+  {% if filters.values()|select|list %}<a class="small" href="{{ url_for('first_timers.index') }}">Clear filters</a>{% endif %}
+</form>
+
+<div class="panel">
+  {% if rows %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Phone</th>
+          <th scope="col">Visited</th>
+          <th scope="col">Born again</th>
+          <th scope="col">Follow-up</th>
+          <th scope="col">Came back</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="name">
+            <a href="{{ url_for('first_timers.detail', ft_id=r.id) }}">{{ r.first_name }} {{ r.other_names or "" }}</a>
+            {% if r.residence %}<span class="sub">{{ r.residence }}</span>{% endif %}
+          </td>
+          <td class="nowrap num">{{ r.phone|phone or "None" }}</td>
+          <td class="nowrap">{{ r.visit_date|nicedate("%d %b %Y") }}<span class="sub">{{ SERVICES.get(r.service, r.service)|replace(" service", "")|replace("Thursday Dominion", "Dominion") }}</span></td>
+          <td>{{ BORN_AGAIN.get(r.born_again, "") }}</td>
+          <td>{{ status_pill(r.sms_status) }}<span class="sub">{{ r.reminders }} of {{ weeks * 2 }} reminders</span></td>
+          <td>{% if r.returns %}{{ r.returns }} {{ "time" if r.returns == 1 else "times" }}{% endif %}{% if r.is_member %}<span class="sub">Member</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <nav class="filters" style="margin:16px 0 0" aria-label="Pages">
+    {% if page > 1 %}<a class="btn btn-secondary btn-small" href="{{ url_for('first_timers.index', page=page-1, **filters) }}">Previous</a>{% endif %}
+    <span class="small muted">Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a class="btn btn-secondary btn-small" href="{{ url_for('first_timers.index', page=page+1, **filters) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% else %}
+  <div class="empty">
+    {% if filters.values()|select|list %}
+    <h2>Nobody matches these filters</h2>
+    <p><a href="{{ url_for('first_timers.index') }}">Clear the filters</a> to see everyone.</p>
+    {% else %}
+    <h2>No first timers yet</h2>
+    <p>Start with the cards from the last service.</p>
+    <p><a class="btn" href="{{ url_for('first_timers.new') }}">Add the first card</a></p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% from "_macros.html" import icon, rays %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %}{{ " | " if self.title() }}{{ settings.get("church_short", "BCI") }} First Timers</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}app{% endblock %}">
+{% block shell %}
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <img src="{{ url_for('static', filename='img/logo-160.png') }}" alt="" width="72" height="72">
+      <div>
+        <span class="brand-name">{{ settings.get("church_name", "Breakthrough Chapel International") }}</span>
+        <span class="brand-app">First timers</span>
+      </div>
+    </div>
+    {% set ep = request.endpoint or "" %}
+    <nav aria-label="Main">
+      <a href="{{ url_for('dashboard.index') }}" {% if ep == 'dashboard.index' %}aria-current="page"{% endif %}>{{ icon("home") }}Dashboard</a>
+      <a href="{{ url_for('first_timers.new') }}" {% if ep == 'first_timers.new' %}aria-current="page"{% endif %}>{{ icon("plus") }}Add first timer</a>
+      <a href="{{ url_for('first_timers.index') }}" {% if ep.startswith('first_timers.') and ep != 'first_timers.new' %}aria-current="page"{% endif %}>{{ icon("people") }}First timers</a>
+      <a href="{{ url_for('messages.index') }}" {% if ep.startswith('messages.') %}aria-current="page"{% endif %}>{{ icon("message") }}Messages</a>
+      <a href="{{ url_for('prayer.index') }}" {% if ep.startswith('prayer.') %}aria-current="page"{% endif %}>{{ icon("prayer") }}Prayer list</a>
+      {% if g.user and g.user["role"] == "admin" %}
+      <a href="{{ url_for('settings.index') }}" {% if ep.startswith('settings.') %}aria-current="page"{% endif %}>{{ icon("settings") }}Settings</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-foot">
+      {% if sms_mode == "test" %}
+      <p class="mode-note">{{ icon("alert") }}<span>Test mode: SMS are recorded, not sent.</span></p>
+      {% endif %}
+      {% if g.user %}
+      <p class="who">{{ g.user["full_name"] }}</p>
+      <div class="who-actions">
+        <a href="{{ url_for('auth.change_password') }}">Change password</a>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="linklike">Sign out</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </aside>
+
+  <div class="topbar">
+    <button class="menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" id="menu-btn">{{ icon("menu") }}<span class="sr">Menu</span></button>
+    <img src="{{ url_for('static', filename='img/logo-160.png') }}" alt="" width="36" height="36">
+    <span>{{ settings.get("church_short", "BCI") }} First timers</span>
+  </div>
+
+  <main id="main" class="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flashes" role="status">
+        {% for cat, msg in messages %}
+        <p class="flash flash-{{ cat }}">{{ icon("check" if cat == "ok" else "alert") }}<span>{{ msg }}</span></p>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}
+<script>
+  window.BCI_SAMPLE = {{ {
+    "first_name": "Grace",
+    "church": settings.get("church_name", ""),
+    "church_short": settings.get("church_short", ""),
+    "thursday_service": settings.get("thursday_service_name", ""),
+    "thursday_time": settings.get("thursday_service_time", ""),
+    "sunday_time": settings.get("sunday_service_time", ""),
+    "location": settings.get("church_location", "")
+  }|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

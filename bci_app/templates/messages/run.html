@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import msg_status %}
+{% block title %}{{ campaigns.get(run.campaign, run.campaign) }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="small" style="margin:0 0 6px"><a href="{{ url_for('messages.index') }}">Messages</a></p>
+    <h1>{{ campaigns.get(run.campaign, run.campaign) }}</h1>
+    <p>{{ run.started_at|nicetime }}, {{ "sent automatically" if run.triggered_by == "auto" else "sent by " ~ (run.by_name or "staff") }}{% if run.provider == "test" %}, in test mode{% endif %}. {{ run.recipients }} recipients, {{ run.failed }} failed.</p>
+  </div>
+  {% if run.failed %}
+  <div class="page-actions">
+    <form method="post" action="{{ url_for('messages.retry', run_id=run.id) }}" data-once>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn" type="submit" data-busy="Resending...">Resend the {{ run.failed }} failed</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<section class="panel">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">To</th><th scope="col">Phone</th><th scope="col">Status</th><th scope="col">Message</th></tr></thead>
+      <tbody>
+        {% for m in msgs %}
+        <tr>
+          <td class="name">{% if m.first_timer_id %}<a href="{{ url_for('first_timers.detail', ft_id=m.first_timer_id) }}">{{ m.first_name }} {{ m.other_names or "" }}</a>{% else %}Test{% endif %}</td>
+          <td class="nowrap num">{{ m.phone|phone }}</td>
+          <td>{{ msg_status(m.status) }}{% if m.error %}<span class="sub" style="color:var(--red)">{{ m.error }}</span>{% endif %}{% if m.cost %}<span class="sub">{{ m.cost }}</span>{% endif %}</td>
+          <td class="small">{{ m.body }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% if run.failed %}
+<p class="small muted" style="margin-top:14px">If a number is wrong, open the person's record, correct it, then come back and resend. Resending uses their current number.</p>
+{% endif %}
+{% endblock %}
